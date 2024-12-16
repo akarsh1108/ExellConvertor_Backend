@@ -1,9 +1,14 @@
-from fastapi import FastAPI, File, UploadFile, Form
+import io
+from turtle import pd
+import chardet
+from fastapi import FastAPI, File, HTTPException, UploadFile, Form
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from tempfile import NamedTemporaryFile
 import os
-
+from fpdf import FPDF
+import pandas as pd
+import pdfkit
 from accident import accident_process_excel
 from advance import advance_process_excel
 from bonusFromC import bonus_process_excel
@@ -15,6 +20,11 @@ from muster import muster_process_excel
 from overtime import overtime_process_excel
 from wagesRegister import wages_process_excel
 from workmen import workmen_process_excel
+from matplotlib.backends.backend_pdf import PdfPages
+import matplotlib.pyplot as plt
+from openpyxl import load_workbook
+from io import BytesIO
+
  # Assuming you have added damage_process_excel
 
 # FastAPI instance
@@ -111,3 +121,57 @@ async def process_excel_endpoint(
 
     except Exception as e:
         return {"error": str(e)}
+
+@app.post("/convert-to-pdf/")
+async def convert_xlsx_to_pdf(xlsx_file: UploadFile = File(...), process_name: str = Form(...)):
+    output_filename = None  # Ensure variable is defined before try block
+    try:
+        # Validate file extension
+        if not xlsx_file.filename.endswith(('.xlsx', '.xlsm')):
+            raise HTTPException(status_code=400, detail="Uploaded file is not a valid Excel file.")
+
+        # Read the uploaded Excel file
+        contents = await xlsx_file.read()
+        excel_data = BytesIO(contents)
+
+        # Attempt to load the workbook
+        try:
+            workbook = load_workbook(excel_data)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail="Failed to read Excel file. Ensure the file is valid and not corrupted.")
+
+        # Extract data from the workbook
+        sheet = workbook.active
+        data = sheet.values
+        columns = next(data)  # Extract header row
+        df = pd.DataFrame(data, columns=columns)
+
+        # Define output PDF filename
+        output_filename = f"{process_name}.pdf"
+
+        # Create a PDF with matplotlib
+        with PdfPages(output_filename) as pdf:
+            fig, ax = plt.subplots(figsize=(8.5, 11))  # Letter size dimensions
+            ax.axis('tight')
+            ax.axis('off')
+
+            # Create a table plot
+            table = ax.table(cellText=df.values, colLabels=df.columns, loc='center', cellLoc='center')
+            table.auto_set_font_size(False)
+            table.set_fontsize(10)
+            table.auto_set_column_width(col=list(range(len(df.columns))))
+
+            # Add the table to the PDF
+            pdf.savefig(fig, bbox_inches='tight')
+            plt.close(fig)
+
+        return FileResponse(output_filename, media_type="application/pdf", filename=output_filename)
+
+    except HTTPException as http_ex:
+        raise http_ex
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        # Clean up generated file
+        if output_filename and os.path.exists(output_filename):
+            os.remove(output_filename)
