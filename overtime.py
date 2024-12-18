@@ -39,7 +39,6 @@ def combine_headers(row_11, row_12):
             combined_headers.append("")  # Empty header
     return combined_headers
 
-
 def overtime_process_excel(base_file_path, temp_master_file_path, temp_output_file):
     # Load the input workbook
     wb_accident = load_workbook(base_file_path)
@@ -72,8 +71,12 @@ def overtime_process_excel(base_file_path, temp_master_file_path, temp_output_fi
 
     # Insert data from master.xlsx into the input file starting from row 14
     row_idx = 14
+    data_inserted = False  # Flag to check if any data is inserted
+
     for master_row in sheet_master.iter_rows(min_row=4, values_only=True):  # Data starts from row 4
         accident_row_data = {}  # Temporary storage for the row data
+        skip_row = False  # Flag to skip rows where "overtime earnings" is empty
+
         for accident_col, master_col in COLUMN_MAPPING.items():
             if master_col:  # Skip mappings with empty master columns
                 accident_col_normalized = normalize_string(accident_col)
@@ -81,15 +84,34 @@ def overtime_process_excel(base_file_path, temp_master_file_path, temp_output_fi
                 if accident_col_normalized in accident_headers and master_col_normalized in master_headers:
                     accident_col_idx = accident_headers[accident_col_normalized]
                     master_col_idx = master_headers[master_col_normalized]
+
+                    # Check if "overtime earnings" is empty
+                    if accident_col == "overtime earnings" and not master_row[master_col_idx - 1]:
+                        skip_row = True
+                        break  # Skip processing this row
                     accident_row_data[accident_col_idx] = master_row[master_col_idx - 1]
 
-        # Populate the row in the input file
-        for col_idx, value in accident_row_data.items():
-            cell = sheet_accident.cell(row=row_idx, column=col_idx)
-            cell.value = value
-            cell.alignment = Alignment(horizontal="center", vertical="center")  # Center-align data
-        
-        row_idx += 1
+        # Populate the row in the input file if valid
+        if not skip_row and accident_row_data:
+            for col_idx, value in accident_row_data.items():
+                cell = sheet_accident.cell(row=row_idx, column=col_idx)
+                cell.value = value
+                cell.alignment = Alignment(horizontal="center", vertical="center")  # Center-align data
+            row_idx += 1
+            data_inserted = False
+
+    # If no data was inserted, write "NO OVERTIME WORKED FOR THE MONTH OF OCT 2024"
+    if not data_inserted:
+        for row in sheet_accident.iter_rows(min_row=14):
+            for cell in row:
+                cell.value = None
+        start_column = 5  # Column D
+        end_column = sheet_accident.max_column  # End of the table
+        sheet_accident.merge_cells(start_row=18, start_column=start_column, 
+                                   end_row=18, end_column=end_column)
+        message_cell = sheet_accident.cell(row=18, column=start_column)
+        message_cell.value = "NO OVERTIME WORKED FOR THE MONTH OF NOV 2024"
+        message_cell.alignment = Alignment(horizontal="left", vertical="center")
 
     # Apply borders to all cells under row 12 for columns with headers
     thin_border = Border(
@@ -111,7 +133,6 @@ def overtime_process_excel(base_file_path, temp_master_file_path, temp_output_fi
 
     # Save the updated file
     wb_accident.save(temp_output_file)
-    print(f"Data inserted and borders applied successfully. File saved as: {temp_output_file}")
+    print(f"Data inserted, borders applied successfully, and file saved as: {temp_output_file}")
 
     return temp_output_file
-

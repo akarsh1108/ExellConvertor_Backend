@@ -81,8 +81,11 @@ def damage_process_excel(damage_file_path, master_file_path, output_file_path):
 
     # Insert data from master.xlsx into damage.xlsx starting from row 14
     row_idx = 14
+    data_inserted = False  # Flag to check if any data is inserted
     for master_row in sheet_master.iter_rows(min_row=4, values_only=True):  # Data starts from row 4
         damage_row_data = {}  # Temporary storage for the damage row data
+        skip_row = False  # Flag to skip the row if Particulars is empty
+        
         for damage_col, master_col in COLUMN_MAPPING.items():
             if master_col:  # Skip mappings with empty master columns
                 damage_col_normalized = normalize_string(damage_col)
@@ -90,15 +93,34 @@ def damage_process_excel(damage_file_path, master_file_path, output_file_path):
                 if damage_col_normalized in damage_headers and master_col_normalized in master_headers:
                     damage_col_idx = damage_headers[damage_col_normalized]
                     master_col_idx = master_headers[master_col_normalized]
+                    
+                    # Check if "Particulars of Damages or Loss" is empty
+                    if damage_col == "Particulars of Damages or Loss" and not master_row[master_col_idx - 1]:
+                        skip_row = True
+                        break  # Skip processing this row
                     damage_row_data[damage_col_idx] = master_row[master_col_idx - 1]
 
-        # Populate the row in damage.xlsx
-        for col_idx, value in damage_row_data.items():
-            cell = sheet_damage.cell(row=row_idx, column=col_idx)
-            cell.value = value
-            cell.alignment = Alignment(horizontal="center", vertical="center")  # Center-align data
-        
-        row_idx += 1
+        # Populate the row in damage.xlsx if not skipped
+        if not skip_row and damage_row_data:
+            for col_idx, value in damage_row_data.items():
+                cell = sheet_damage.cell(row=row_idx, column=col_idx)
+                cell.value = value
+                cell.alignment = Alignment(horizontal="center", vertical="center")  # Center-align data
+            row_idx += 1
+            data_inserted = False
+
+    # If no data was inserted, write "NO DAMAGES OR LOSSES RECORDED FOR THE MONTH OF OCT 2024"
+    if not data_inserted:
+        for row in sheet_damage.iter_rows(min_row=13):
+            for cell in row:
+                cell.value = None
+        start_column = 4  # Column D
+        end_column = sheet_damage.max_column  # End of the table
+        sheet_damage.merge_cells(start_row=18, start_column=start_column, 
+                                 end_row=18, end_column=end_column)
+        message_cell = sheet_damage.cell(row=18, column=start_column)
+        message_cell.value = "NO DAMAGES OR LOSSES RECORDED FOR THE MONTH OF NOV 2024"
+        message_cell.alignment = Alignment(horizontal="left", vertical="center")
 
     # Apply borders to all cells under row 12 for columns with headers
     thin_border = Border(

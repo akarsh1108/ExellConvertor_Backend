@@ -1,6 +1,6 @@
 from openpyxl import load_workbook
 from openpyxl.styles import Alignment, Font, Border, Side
-from pyxlsb import open_workbook as open_xlsb
+
 import os
 
 # Column mapping
@@ -13,11 +13,13 @@ COLUMN_MAPPING = {
     "Location": "Location",
     "UAN":"Unique PF No.",
     "ESIC":"Esic No",
+    "Unit of works done":"EMPLOYEE WORKDAYS",
     "Amount of Wages Earned_Basic+DA": "Basic",
     "Basic+DA Arrear": "Basic (Arrear)",
     "HRA": "HRA",
     "HRA Arrear": "HRA (Arrear)",
     "Special Allow.": "Special Allowance",
+    "Special Allow. Arrear":"Special Allowance (Arrear)",
     "Special Allow. PF": "Special Allowance - PF",
     "Special Allow. PF Arrear": "Special Allowance - PF (Arrear)",
     "Bonus Gross.": "Bonus Gross",

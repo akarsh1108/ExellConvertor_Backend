@@ -8,7 +8,7 @@ from tempfile import NamedTemporaryFile
 import os
 from fpdf import FPDF
 import pandas as pd
-import pdfkit
+
 from accident import accident_process_excel
 from advance import advance_process_excel
 from bonusFromC import bonus_process_excel

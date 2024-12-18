@@ -16,7 +16,7 @@ COLUMN_MAPPING = {
     "Age and Sex": "Gender",
     "Father's/ Husband's Name": "Father Name",
     "Nature of Employment/ Designation": "Designation",
-    "Permanent Home Address of Workmen (Village and Tahsil/ Taluk and District)": "Location",
+    "Permanent Home Address of Workmen (Village and Tahsil/ Taluk and District)": "",
     "Local Address": "",
     "Date of Commencement of  Employment": "Date of Joining",
     "Signature or Thumb- Impression of Workmen": "",
@@ -122,6 +122,16 @@ def workmen_process_excel(base_file_path, temp_master_file_path, temp_output_fil
         
         row_idx += 1
 
+    # Write "Transferred" in column K for rows 12, 13, 15, and 16
+    column_k_index = 11  # K is the 11th column
+    rows_to_update = [12, 13, 15, 16]
+
+    for row in rows_to_update:
+        cell = sheet_accident.cell(row=row, column=column_k_index)
+        cell.value = "Transferred"
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.font = Font(bold=False)  # Optional: Make the text bold for emphasis
+
     # Apply borders to all cells under row 12 for columns with headers
     thin_border = Border(
         left=Side(style="thin"),
@@ -146,7 +156,6 @@ def workmen_process_excel(base_file_path, temp_master_file_path, temp_output_fil
 
     # Save the updated file
     wb_accident.save(temp_output_file)
-    print(f"Data inserted, borders applied, and rightmost column trimmed successfully. File saved as: {temp_output_file}")
+    print(f"Data inserted, 'Transferred' written in column K, borders applied, and rightmost column trimmed successfully. File saved as: {temp_output_file}")
 
     return temp_output_file
-

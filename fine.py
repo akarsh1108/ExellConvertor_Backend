@@ -34,8 +34,6 @@ def combine_headers(row_11, row_12):
         else:
             combined_headers.append("")
     return combined_headers
-
-
 def fine_process_excel(base_file_path, temp_master_file_path, temp_output_file):
     """Process the Fine Excel file with data from the master file."""
     # Load the input workbook (Fine.xlsx)
@@ -69,8 +67,11 @@ def fine_process_excel(base_file_path, temp_master_file_path, temp_output_file):
 
     # Insert data from master.xlsx into Fine.xlsx starting from row 14
     row_idx = 14
+    data_inserted = False  # Flag to check if any data is inserted
     for master_row in sheet_master.iter_rows(min_row=4, values_only=True):  # Data starts from row 4
         fine_row_data = {}  # Temporary storage for the fine row data
+        skip_row = False  # Flag to skip the row if "Amount of fine imposed" is empty
+        
         for fine_col, master_col in COLUMN_MAPPING.items():
             if master_col:  # Skip mappings with empty master columns
                 fine_col_normalized = normalize_string(fine_col)
@@ -78,15 +79,34 @@ def fine_process_excel(base_file_path, temp_master_file_path, temp_output_file):
                 if fine_col_normalized in fine_headers and master_col_normalized in master_headers:
                     fine_col_idx = fine_headers[fine_col_normalized]
                     master_col_idx = master_headers[master_col_normalized]
+                    
+                    # Check if "Amount of fine imposed" is empty
+                    if fine_col == "Amount of fine imposed" and not master_row[master_col_idx - 1]:
+                        skip_row = True
+                        break  # Skip processing this row
                     fine_row_data[fine_col_idx] = master_row[master_col_idx - 1]
 
-        # Populate the row in Fine.xlsx
-        for col_idx, value in fine_row_data.items():
-            cell = sheet_fine.cell(row=row_idx, column=col_idx)
-            cell.value = value
-            cell.alignment = Alignment(horizontal="center", vertical="center")  # Center-align data
-        
-        row_idx += 1
+        # Populate the row in Fine.xlsx if not skipped
+        if not skip_row and fine_row_data:
+            for col_idx, value in fine_row_data.items():
+                cell = sheet_fine.cell(row=row_idx, column=col_idx)
+                cell.value = value
+                cell.alignment = Alignment(horizontal="center", vertical="center")  # Center-align data
+            row_idx += 1
+            data_inserted = False
+
+    # If no data was inserted, write "NO FINES IMPOSED FOR THE MONTH OF OCT 2024"
+    if not data_inserted:
+        for row in sheet_fine.iter_rows(min_row=14):
+            for cell in row:
+                cell.value = None
+        start_column = 4  # Column D
+        end_column = sheet_fine.max_column  # End of the table
+        sheet_fine.merge_cells(start_row=18, start_column=start_column, 
+                               end_row=18, end_column=end_column)
+        message_cell = sheet_fine.cell(row=18, column=start_column)
+        message_cell.value = "NO FINES IMPOSED FOR THE MONTH OF NOV 2024"
+        message_cell.alignment = Alignment(horizontal="left", vertical="center")
 
     # Apply borders to all cells under row 13 for columns with headers
     thin_border = Border(

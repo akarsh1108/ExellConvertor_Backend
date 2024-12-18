@@ -11,15 +11,15 @@ COLUMN_MAPPING = {
     "Whether he has completed 15 years of age at the beginning of the accounting month": "",
     "Designation ": "Designation",
     "No. of days worked in the month": "EMPLOYEE WORKDAYS",
-    "Total salary or wage in respect of the accounting Month": "GROSS",
-    "Amount of bonus payable under section 10 or section 11, as the case may be": "",
+    "Total salary or wage in respect of the accounting Month": "Basic",
+    "Amount of bonus payable under section 10 or section 11, as the case may be": "Bonus Gross",
     "Puja bonus or other customary bonus paid during the accounting Month": "",
-    "Interim bonus or bonus paid in advance": "",
+    "Interim bonus or bonus paid in advance":  "Bonus Gross",
     "Amount of Income-tax deduced":"Income Tax",
     "Deduction on account of financial loss, if any, caused by misconduct of the employee":"",
-    "Total sum deducted under Columns 9, 10, 10A and 11":"TOTAL DEDUCTIONS",
-    "Net amount payable (Column 8 minus Column 12)":"",
-    "Amount actually paid":"NET PAY",
+    "Total sum deducted under Columns 9, 10, 10A and 11":"Bonus Gross",
+    "Net amount payable (Column 8 minus Column 12)":"Bonus Gross",
+    "Amount actually paid":"Bonus Gross",
     "Date on which paid":"Salary Processed Month",
     "Signature/Thumb impression of the employee":"",
     "State":"State",
@@ -82,6 +82,7 @@ def bonus_process_excel(bonus_file_path, master_file_path, output_file_path):
 
     # Insert data from master.xlsx into BonusFormC.xlsx starting from row 14
     row_idx = 14
+    column_r_index = 18  # Column R corresponds to the 18th column
     for master_row in sheet_master.iter_rows(min_row=4, values_only=True):  # Data starts from row 4
         bonus_row_data = {}  # Temporary storage for the bonus row data
         for bonus_col, master_col in COLUMN_MAPPING.items():
@@ -98,6 +99,9 @@ def bonus_process_excel(bonus_file_path, master_file_path, output_file_path):
             cell = sheet_bonus.cell(row=row_idx, column=col_idx)
             cell.value = value
             cell.alignment = Alignment(horizontal="center", vertical="center")  # Center-align data
+
+        # Write "Paid on every 7th day of each month" in Column R
+        sheet_bonus.cell(row=row_idx, column=column_r_index, value="Paid on every 7th day of each month")
 
         row_idx += 1
 
@@ -121,6 +125,6 @@ def bonus_process_excel(bonus_file_path, master_file_path, output_file_path):
 
     # Save the updated BonusFormC.xlsx file
     wb_bonus.save(output_file_path)
-    print(f"Data inserted and borders applied successfully. New file saved as: {output_file_path}")
+    print(f"Data inserted, 'Paid on every 7th day of each month' added in column R. File saved as: {output_file_path}")
 
     return output_file_path

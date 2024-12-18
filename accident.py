@@ -42,7 +42,6 @@ def combine_headers(row_11, row_12):
         else:
             combined_headers.append("")
     return combined_headers
-
 def accident_process_excel(accident_file_path, master_file_path, output_file_path):
     # Load the input workbook (accident.xlsx)
     wb_accident = load_workbook(accident_file_path)
@@ -75,6 +74,7 @@ def accident_process_excel(accident_file_path, master_file_path, output_file_pat
 
     # Insert data from master.xlsx into accident.xlsx starting from row 13
     row_idx = 13
+    data_inserted = False  # Flag to check if any data is inserted
     for master_row in sheet_master.iter_rows(min_row=4, values_only=True):  # Data starts from row 4
         accident_row_data = {}  # Temporary storage for the accident row data
         for accident_col, master_col in COLUMN_MAPPING.items():
@@ -84,15 +84,27 @@ def accident_process_excel(accident_file_path, master_file_path, output_file_pat
                 if accident_col_normalized in accident_headers and master_col_normalized in master_headers:
                     accident_col_idx = accident_headers[accident_col_normalized]
                     master_col_idx = master_headers[master_col_normalized]
+                    if accident_col == "Insurance No." and not master_row[master_col_idx - 1]:
+                        continue  # Skip this column if "Insurance No." has no value
                     accident_row_data[accident_col_idx] = master_row[master_col_idx - 1]
 
-        # Populate the row in accident.xlsx
-        for col_idx, value in accident_row_data.items():
-            cell = sheet_accident.cell(row=row_idx, column=col_idx)
-            cell.value = value
-            cell.alignment = Alignment(horizontal="center", vertical="center")  # Center-align data
-        
-        row_idx += 1
+        # Only write the row if any data exists
+        if accident_row_data:
+            for col_idx, value in accident_row_data.items():
+                cell = sheet_accident.cell(row=row_idx, column=col_idx)
+                cell.value = value
+                cell.alignment = Alignment(horizontal="center", vertical="center")  # Center-align data
+            row_idx += 1
+            # data_inserted = True
+
+    # If no data was inserted, write "NO ANY ACCIDENT FOR THE MONTH OF OCT 2024" in row 18, column D
+    if not data_inserted:
+        for row in sheet_accident.iter_rows(min_row=13):
+            for cell in row:
+                cell.value = None
+        message_cell = sheet_accident.cell(row=18, column=4)
+        message_cell.value = "NO ANY ACCIDENT FOR THE MONTH OF NOV 2024"
+        message_cell.alignment = Alignment(horizontal="left", vertical="center")
 
     # Apply borders to all cells under row 12 for columns with headers
     thin_border = Border(
@@ -117,4 +129,3 @@ def accident_process_excel(accident_file_path, master_file_path, output_file_pat
     print(f"Data inserted and borders applied successfully. New file saved as: {output_file_path}")
 
     return output_file_path
-
