@@ -22,7 +22,7 @@ COLUMN_MAPPING = {
     "Special Allow. Arrear":"Special Allowance (Arrear)",
     "Special Allow. PF": "Special Allowance - PF",
     "Special Allow. PF Arrear": "Special Allowance - PF (Arrear)",
-    "Bonus Gross.": "Bonus Gross",
+    "Bonus Gross": "Bonus Gross",
     "Bonus Gross Arrear": "Bonus Gross (Arrear)",
     "Incentive":"Onetime/Quarterly Incentive",
     "OT":"OT",
@@ -108,6 +108,29 @@ def wages_process_excel(base_file_path, temp_master_file_path, temp_output_file)
             cell = sheet_input.cell(row=row_idx, column=col_idx)
             cell.value = value
             cell.alignment = Alignment(horizontal="center", vertical="center")
+
+        # Calculate and insert sums in BL and BT
+        bl_sum = 0
+        bt_sum = 0
+
+        # AZ to BK (columns 52 to 63 in 1-based index)
+        for col_idx in range(52, 64):
+            value = master_row[col_idx - 1]  # Convert to 0-based index
+            bl_sum += float(value) if isinstance(value, (int, float)) else 0
+
+        # Bm to BP (columns 65 to 68 in 1-based index)
+        for col_idx in range(65, 69):
+            value = master_row[col_idx - 1]  # Convert to 0-based index
+            bt_sum += float(value) if isinstance(value, (int, float)) else 0
+
+        # Write the calculated sums
+        sheet_input.cell(row=row_idx, column=23, value=bl_sum)  # W (column 23)
+        sheet_input.cell(row=row_idx, column=31, value=bt_sum)  # AE (column 31)
+
+        # Calculate and insert BU (BL - BT)
+        bu_value = bl_sum - bt_sum
+        sheet_input.cell(row=row_idx, column=32, value=bu_value)  # BU (column 73)
+
         row_idx += 1
 
     # Apply borders
@@ -127,13 +150,8 @@ def wages_process_excel(base_file_path, temp_master_file_path, temp_output_file)
         if merged_range.min_row <= 13:
             sheet_input.merge_cells(str(merged_range))
 
-    # Delete the rightmost column
-    sheet_input.delete_cols(sheet_input.max_column)
-
     # Save the updated file
     wb_input.save(temp_output_file)
     print(f"Data inserted and formatted successfully. File saved as: {temp_output_file}")
 
     return temp_output_file
-
-
