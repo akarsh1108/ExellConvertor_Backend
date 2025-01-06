@@ -18,6 +18,7 @@ from fine import fine_process_excel
 from formD import formD_process_excel
 from muster import muster_process_excel
 from overtime import overtime_process_excel
+from pdfHighlighter import extract_identifiers_from_excel, highlight_identifiers_in_pdf
 from wagesRegister import wages_process_excel
 from workmen import workmen_process_excel
 from matplotlib.backends.backend_pdf import PdfPages
@@ -53,6 +54,114 @@ MUSTER_FILE_PATH = os.path.join(INPUT_FOLDER, "muster.xlsx")
 OVERTIME_FILE_PATH = os.path.join(INPUT_FOLDER, "overtime.xlsx")
 WAGES_FILE_PATH = os.path.join(INPUT_FOLDER, "wages.xlsx")
 WORKMEN_FILE_PATH = os.path.join(INPUT_FOLDER, "workmen.xlsx")
+
+from fastapi import FastAPI, Form, File, UploadFile
+from fastapi.responses import FileResponse, JSONResponse
+from tempfile import NamedTemporaryFile
+import os
+import zipfile
+from typing import List
+
+app = FastAPI()
+
+# Configure CORS settings
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],  
+)
+
+@app.post("/process-all-excel/")
+async def process_excel_endpoint(
+    process_name: str = Form(...),  # Accept process name as form data
+    master_file: UploadFile = File(...)  # Accept master file as a file upload
+):
+    """API to process Excel files with a specified process."""
+    file_path_mapping = {
+        "accident": ACCIDENT_FILE_PATH,
+        "advance": ADVANCE_FILE_PATH,
+        "bonusformc": BONUSFORMC_FILE_PATH,
+        "damage": DAMAGE_FILE_PATH,
+        "esicpf": ESP_FILE_PATH,
+        "fine": FINE_FILE_PATH,
+        "formd": FORMD_FILE_PATH,
+        "muster": MUSTER_FILE_PATH,
+        "overtime": OVERTIME_FILE_PATH,
+        "wages": WAGES_FILE_PATH,
+        "workmen": WORKMEN_FILE_PATH,
+        "all": None,  # Special key to process all
+    }
+
+    # Validate process name
+    process_name = process_name.lower()
+    if process_name not in file_path_mapping:
+        return JSONResponse({"error": f"Unsupported process name: {process_name}"}, status_code=400)
+
+    processed_files = []
+
+    try:
+        # Save the uploaded master file to a temporary location
+        with NamedTemporaryFile(delete=False, suffix=".xlsx") as temp_master_file:
+            temp_master_file.write(await master_file.read())
+            temp_master_file_path = temp_master_file.name
+
+            # Determine processes to run based on process_name
+            if process_name == "all":
+                processes_to_run = file_path_mapping.keys() - {"all"}  # Exclude "all" itself
+            else:
+                processes_to_run = [process_name]
+
+            # Loop through the selected processes
+            for key in processes_to_run:
+                base_file_path = file_path_mapping[key]
+
+                # Validate base file existence for each process
+                if not os.path.exists(base_file_path):
+                    return JSONResponse({"error": f"{base_file_path} not found in the input folder."}, status_code=400)
+
+                with NamedTemporaryFile(delete=False, suffix=".xlsx") as temp_output_file:
+                    temp_output_file_path = temp_output_file.name
+
+                    # Call the appropriate processing function
+                    if key == "accident":
+                        output_file_path = accident_process_excel(base_file_path, temp_master_file_path, temp_output_file_path)
+                    elif key == "advance":
+                        output_file_path = advance_process_excel(base_file_path, temp_master_file_path, temp_output_file_path)
+                    elif key == "bonusformc":
+                        output_file_path = bonus_process_excel(base_file_path, temp_master_file_path, temp_output_file_path)
+                    elif key == "damage":
+                        output_file_path = damage_process_excel(base_file_path, temp_master_file_path, temp_output_file_path)
+                    elif key == "esicpf":
+                        output_file_path = esicpf_process_excel(base_file_path, temp_master_file_path, temp_output_file_path)
+                    elif key == "fine":
+                        output_file_path = fine_process_excel(base_file_path, temp_master_file_path, temp_output_file_path)
+                    elif key == "formd":
+                        output_file_path = formD_process_excel(base_file_path, temp_master_file_path, temp_output_file_path)
+                    elif key == "muster":
+                        output_file_path = muster_process_excel(base_file_path, temp_master_file_path, temp_output_file_path)
+                    elif key == "overtime":
+                        output_file_path = overtime_process_excel(base_file_path, temp_master_file_path, temp_output_file_path)
+                    elif key == "wages":
+                        output_file_path = wages_process_excel(base_file_path, temp_master_file_path, temp_output_file_path)
+                    elif key == "workmen":
+                        output_file_path = workmen_process_excel(base_file_path, temp_master_file_path, temp_output_file_path)
+
+                    # Add the output file to the list
+                    processed_files.append((key, output_file_path))
+
+        # Create a ZIP file containing all processed files
+        with NamedTemporaryFile(delete=False, suffix=".zip") as temp_zip_file:
+            with zipfile.ZipFile(temp_zip_file.name, 'w') as zipf:
+                for key, file_path in processed_files:
+                    zipf.write(file_path, arcname=f"{key}_updated.xlsx")
+
+            return FileResponse(temp_zip_file.name, filename="processed_files.zip")
+
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
 
 @app.post("/process-excel/")
 async def process_excel_endpoint(
@@ -175,3 +284,47 @@ async def convert_xlsx_to_pdf(xlsx_file: UploadFile = File(...), process_name: s
         # Clean up generated file
         if output_filename and os.path.exists(output_filename):
             os.remove(output_filename)
+
+
+@app.post("/highlight-pdf/")
+async def highlight_pdf_endpoint(xlsx_file: UploadFile = File(...), pdf_file: UploadFile = File(...)):
+    """
+    API endpoint to process an Excel file and PDF file, highlight identifiers in the PDF,
+    and return the highlighted PDF as a response.
+
+    Args:
+        xlsx_file (UploadFile): The Excel file containing identifiers.
+        pdf_file (UploadFile): The PDF file to be highlighted.
+
+    Returns:
+        FileResponse: The highlighted PDF file.
+    """
+    try:
+        # Save the uploaded files temporarily
+        with NamedTemporaryFile(delete=False, suffix=".xlsx") as temp_xlsx, NamedTemporaryFile(delete=False, suffix=".pdf") as temp_pdf:
+            temp_xlsx.write(await xlsx_file.read())
+            temp_pdf.write(await pdf_file.read())
+            temp_xlsx_path = temp_xlsx.name
+            temp_pdf_path = temp_pdf.name
+
+        # Extract identifiers from the Excel file
+        identifiers = extract_identifiers_from_excel(temp_xlsx_path)
+
+        # Define output file path for the highlighted PDF
+        with NamedTemporaryFile(delete=False, suffix=".pdf") as temp_output_pdf:
+            output_pdf_path = temp_output_pdf.name
+
+        # Highlight the identifiers in the PDF
+        result_pdf_path = highlight_identifiers_in_pdf(
+            input_pdf_path=temp_pdf_path,
+            output_pdf_path=output_pdf_path,
+            identifiers=identifiers,
+        )
+
+        # Return the highlighted PDF
+        return FileResponse(result_pdf_path, filename="highlighted_result.pdf", media_type="application/pdf")
+
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        return {"error": str(e)}
